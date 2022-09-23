@@ -9,6 +9,7 @@ import numpy as np
 import time, datetime
 import subprocess, os, signal
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPen, QColor, QFont, QImage
+import IIHEPhotoDB
 
 object_types = ["kapton strip","bridge", "pigtail","FEH","SEH","hybrid","skeleton","module","other"]
 
@@ -38,13 +39,13 @@ class VideoThread(QThread):
 
     def run(self):
         # capture from web cam
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(4)
         self.failed = False
         self._run_flag = True
         while self._run_flag:
             while not cap.isOpened():
                 time.sleep(0.1)
-                cap = cv2.VideoCapture(0)
+                cap = cv2.VideoCapture(4)
             ret, cv_img = cap.read()
             if ret == 0 and not self.failed:
                 self.failed = True
@@ -75,7 +76,7 @@ class StreamThread(QThread):
         self.run_flag = True
         #self.pro = subprocess.Popen("gphoto2 --stdout --capture-movie | ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video0",shell=True)
         self.p1 = subprocess.Popen(["gphoto2", "--stdout", "--capture-movie"],stdout=subprocess.PIPE)
-        self.p2 = subprocess.Popen("ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video0",shell=True, stdin=self.p1.stdout)
+        self.p2 = subprocess.Popen("ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video4",shell=True, stdin=self.p1.stdout)
     
 
     def stop(self):
@@ -235,9 +236,25 @@ class App(QWidget):
         with open(temp_db, 'a') as f:
             f.write(line)
         os.system(f"mv {self.last_picture} {output_file}")
+        try:
+            db=IIHEPhotoDB.IIHEPhotoDB()
+        except Exception as e:
+            print("Cannot connect to DB\n")
+        else:
+            cat_exist=0
+            cat_list=db.getListOfFolder()
+            folder_Name=self.type_selector.currentText()
+            for i in cat_list:
+                cell_list=i.split(" - ")
+                if(cell_list[1]==folder_Name):
+                    cat_id = cell_list[0]
+                    cat_exist=1
+            if(cat_exist==0):
+                print("New Folder creating...")
+                cat_id = db.createFolder(folder_Name)
+            db.uploadImage(output_file, cat_id, line)
 
         #Upload to db here
-
         
         self.timestamp = 0
         self.last_picture = None
@@ -248,7 +265,7 @@ class App(QWidget):
 
     def open_picture(self):
         print("Opening picture!")
-        os.system(f"gwenview {self.last_picture} &")
+        os.system(f"eog {self.last_picture} &")
 
     def take_picture(self):
         try:
