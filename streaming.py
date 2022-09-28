@@ -251,7 +251,8 @@ class App(QWidget):
         if self.cmd_thread and self.cmd_thread.running:
             print("NO WAY, something is still running...")
         else:
-            self.cmd_thread = CommandSender("gphoto2 --wait-event 0.5s --set-config viewfinder=1 --set-config /main/actions/autofocusdrive=1 --wait-event=10s")
+            time.sleep(2)
+            self.cmd_thread = CommandSender("gphoto2 --wait-event 1s --set-config viewfinder=1 --set-config /main/actions/autofocusdrive=1 --wait-event=10s")
             self.cmd_thread.restart_streaming.connect(self.start_streaming)
             self.cmd_thread.start()
 
