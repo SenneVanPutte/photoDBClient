@@ -2,7 +2,7 @@ from PyQt5 import QtGui
 from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QComboBox, QPushButton,QHBoxLayout,QVBoxLayout,QGroupBox, QLineEdit,QTextEdit
 from PyQt5.QtGui import QPixmap
 import sys
-from click import pass_context
+#from click import pass_context
 import cv2
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread,QPoint
 import numpy as np
@@ -11,7 +11,9 @@ import subprocess, os, signal
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QPen, QColor, QFont, QImage
 import IIHEPhotoDB
 
-object_types = ["kapton strip","bridge", "pigtail","FEH","SEH","hybrid","skeleton","module","other"]
+object_types = ["sensor","kapton strip","bridge", "pigtail","FEH","SEH","hybrid","skeleton","module","other"]
+
+videoId     = 0
 
 temp_dir    = "/tmp/"
 storage_dir = "./storage/"
@@ -39,13 +41,13 @@ class VideoThread(QThread):
 
     def run(self):
         # capture from web cam
-        cap = cv2.VideoCapture(4)
+        cap = cv2.VideoCapture(videoId)
         self.failed = False
         self._run_flag = True
         while self._run_flag:
             while not cap.isOpened():
                 time.sleep(0.1)
-                cap = cv2.VideoCapture(4)
+                cap = cv2.VideoCapture(videoId)
             ret, cv_img = cap.read()
             if ret == 0 and not self.failed:
                 self.failed = True
@@ -76,8 +78,8 @@ class StreamThread(QThread):
         self.run_flag = True
         #self.pro = subprocess.Popen("gphoto2 --stdout --capture-movie | ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video0",shell=True)
         self.p1 = subprocess.Popen(["gphoto2", "--stdout", "--capture-movie"],stdout=subprocess.PIPE)
-        self.p2 = subprocess.Popen("ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video4",shell=True, stdin=self.p1.stdout)
-    
+        self.p2 = subprocess.Popen(f"ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video{videoId}",shell=True, stdin=self.p1.stdout)
+
 
     def stop(self):
         """Sets run flag to False and waits for thread to finish"""
@@ -98,14 +100,35 @@ class StreamThread(QThread):
         #             os.kill(sid, signal.SIGINT)
         self.p1.terminate()
         self.p2.terminate()
-        print("Done")
+        print("Done stopping video capture")
         #os.killpg(os.getpgid(self.pro.pid), signal.SIGTERM)  # Send the signal to all the process groups
         #self.pro.send_signal(signal.SIGTERM)
 
         self.run_flag = False
 
-class TakePictureThread(QThread):
+class CommandSender(QThread):
+    restart_streaming = pyqtSignal()
+    process_file      = pyqtSignal()
+    def __init__(self, command):
+        super().__init__()
+        self.command = command
+        self.running = True
 
+    def run(self):
+        os.system(self.command)
+        time.sleep(0.5)
+        print(self.command)
+        if "download" in self.command:
+            self.process_file.emit()
+        self.stop()
+
+    def stop(self):
+        self.restart_streaming.emit()
+        self.running = False
+        print("Done")
+        
+
+class TakePictureThread(QThread):
     def __init__(self,upper):
         super().__init__()
         self.upper = upper
@@ -117,13 +140,14 @@ class TakePictureThread(QThread):
 
         file_name = f"{f_name}.jpeg"
         if file_name in os.listdir(temp_dir):
-            suffix = 0    
+            suffix = 0
             while file_name in os.listdir(temp_dir):
                 file_name = f"{f_name}_{suffix}.jpeg"
                 suffix+=1
         print(file_name)
-        
-        os.system(f"gphoto2 --wait-event=1s --capture-image-and-download ")
+        os.system("gphoto2 --summary")
+        time.sleep(0.5)
+        os.system(f"gphoto2 --wait-event=2s --capture-image-and-download ")
         os.system(f"mv capt0000.jpg {temp_dir}/{file_name}")
         self.upper.stream_thread.start()
         self.upper.thread.start()
@@ -137,7 +161,7 @@ class TakePictureThread(QThread):
 
     def stop(self):
         print("Done")
-        
+
 class App(QWidget):
     def __init__(self):
         super().__init__()
@@ -147,7 +171,7 @@ class App(QWidget):
         # create the label that holds the image
         self.image_label = QLabel(self)
         self.image_label.resize(self.disply_width, self.display_height)
-        
+
         #Default image...
         self.default_img = cv2.imread('default_img.jpg', 1)
         self.draw_bkg("Starting camera...")
@@ -163,10 +187,14 @@ class App(QWidget):
         hbox.addWidget(side_bar)
         self.title_label = QLabel("Actions")
         self.title_label.setFixedWidth(400)
+        self.cmd_thread = None
 
         v_box.addWidget(self.title_label)
         # v_box.addWidget(button_creator("Start interface", self.start_interface))
         v_box.addWidget(button_creator("Take picture"   , self.take_picture))
+        v_box.addWidget(button_creator("Take manual picture", self.manual_picture))
+        v_box.addWidget(button_creator("Trigger focus", self.trigger_focus))
+        
         self.view_picture_button = button_creator("View picture"  , self.open_picture)
         v_box.addWidget(self.view_picture_button)
         self.store_picture_button = button_creator("Store picture"  , self.store_picture)
@@ -199,7 +227,6 @@ class App(QWidget):
         # connect its signal to the update_image slot
         self.thread.change_pixmap_signal.connect(self.update_image)
 
-
         self.take_picture_thread = TakePictureThread(self)
 
         self.stream_thread = StreamThread()
@@ -218,6 +245,69 @@ class App(QWidget):
             self.image_label.setPixmap(self.convert_cv_qt(self.default_img))
             self.image_label.repaint()
 
+    def trigger_focus(self):
+        self.stop_streaming()
+        self.draw_bkg("Triggering focus")
+        if self.cmd_thread and self.cmd_thread.running:
+            print("NO WAY, something is still running...")
+        else:
+            self.cmd_thread = CommandSender("gphoto2 --wait-event 0.5s --set-config viewfinder=1 --set-config /main/actions/autofocusdrive=1 --wait-event=10s")
+            self.cmd_thread.restart_streaming.connect(self.start_streaming)
+            self.cmd_thread.start()
+
+
+    def stop_streaming(self):
+        self.pause_stream = True
+        print("Stop streaming 1/3")
+        try:
+            self.stream_thread.stop()
+        except Exception as e:
+            print(f"Error {e}")
+        print("Stop streaming 2/3")
+        try:
+            self.thread.stop()
+        except Exception as e:
+            print(f"Error {e}")
+        print("Stop streaming 3/3")
+        try:
+            self.stream_thread.stop()
+        except Exception as e:
+            print(f"Error {e}")
+        print("Done stop streaming")
+
+    def process_picture(self):
+        f_name = datetime.datetime.now().strftime("%Y%d%m_%H%M%S")
+        self.timestamp = time.time()
+
+        file_name = f"{f_name}.jpeg"
+        if file_name in os.listdir(temp_dir):
+            suffix = 0
+            while file_name in os.listdir(temp_dir):
+                file_name = f"{f_name}_{suffix}.jpeg"
+                suffix+=1
+        os.system(f"mv capt0000.jpg {temp_dir}/{file_name}")
+        self.last_picture = temp_dir+"/"+file_name
+        self.file_name_widget.setText(self.last_picture)
+        self.store_picture_button.setEnabled(1)
+        self.view_picture_button.setEnabled(1)
+
+
+
+    def start_streaming(self,param=""):
+        self.stream_thread.start()
+        self.thread.start()
+        self.pause_stream = False
+
+    def manual_picture(self):
+        self.stop_streaming()
+        self.draw_bkg("Manual capture")
+        if self.cmd_thread and self.cmd_thread.running:
+            print("NO WAY, something is still running...")
+        else:
+            self.cmd_thread = CommandSender("gphoto2 --set-config eosremoterelease=Immediate --set-config eosremoterelease='Release Full' --wait-event-and-download=5s")
+            self.cmd_thread.restart_streaming.connect(self.start_streaming)
+            self.cmd_thread.process_file.connect(self.process_picture)
+            self.cmd_thread.start()
 
     def closeEvent(self, event):
         self.thread.stop()
@@ -255,7 +345,7 @@ class App(QWidget):
             db.uploadImage(output_file, cat_id, line)
 
         #Upload to db here
-        
+
         self.timestamp = 0
         self.last_picture = None
         self.store_picture_button.setDisabled(1)
@@ -270,16 +360,23 @@ class App(QWidget):
     def take_picture(self):
         try:
             self.stream_thread.stop()
-        except:
+        except Exception as e:
             print("Error {e}")
         try:
             self.thread.stop()
-        except:
+        except Exception as e:
             print("Error {e}")
-            
+        try:
+            self.stream_thread.stop()
+        except Exception as e:
+            print("Error {e}")
+
         self.take_picture_thread.start()
         self.pause_stream = True
         self.draw_bkg("Taking picture...")
+        self.store_picture_button.setEnabled(1)
+        self.view_picture_button.setEnabled(1)
+
         # time.sleep(1)
         # f_name = datetime.datetime.now().strftime("%Y%d%m_%H%M%S")
 
@@ -287,12 +384,12 @@ class App(QWidget):
 
         # file_name = f"{f_name}.jpeg"
         # if file_name in os.listdir(temp_dir):
-        #     suffix = 0    
+        #     suffix = 0
         #     while file_name in os.listdir(temp_dir):
         #         file_name = f"{f_name}_{suffix}.jpeg"
         #         suffix+=1
         # print(file_name)
-        
+
         # os.system(f"gphoto2 --wait-event=2s --capture-image-and-download ")
         # os.system(f"mv capt0000.jpg {temp_dir}/{file_name}")
         # self.stream_thread.start()
@@ -304,7 +401,7 @@ class App(QWidget):
         # self.file_name_widget.setText(self.last_picture)
 
 
-    
+
     # def take_picture(self):
     #     try:
     #         self.stream_thread.stop()
@@ -315,7 +412,7 @@ class App(QWidget):
     #     os.system(f"gphoto2 --wait-event=2s --capture-image-and-download ")
     #     self.stream_thread.start()
     #     self.thread.start()
-    
+
     @pyqtSlot(np.ndarray)
     def update_image(self, cv_img):
         if self.pause_stream == True:
@@ -323,7 +420,7 @@ class App(QWidget):
         """Updates the image_label with a new opencv image"""
         qt_img = self.convert_cv_qt(cv_img)
         self.image_label.setPixmap(qt_img)
-    
+
     def convert_cv_qt(self, cv_img):
         """Convert from an opencv image to QPixmap"""
         rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
@@ -332,7 +429,7 @@ class App(QWidget):
         convert_to_Qt_format = QtGui.QImage(rgb_image.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
         p = convert_to_Qt_format.scaled(self.disply_width, self.display_height, Qt.KeepAspectRatio)
         return QPixmap.fromImage(p)
-    
+
 if __name__=="__main__":
     app = QApplication(sys.argv)
     a = App()
