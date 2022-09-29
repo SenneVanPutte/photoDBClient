@@ -235,7 +235,11 @@ class StorePicture(QThread):
                 self.cmd_signal.emit(f"set_db_status_text {l0} creating_folder...")
                 cat_id = db.createFolder(folder_Name)
             self.cmd_signal.emit(f"set_db_status_text {l0} uploading_to_db...")
-            db.uploadImage(output_file, cat_id, tags,self.comment)
+            db.uploadImage(self.output_file, cat_id, tags,self.comment)
 
         self.cmd_signal.emit(f"set_db_status_text {l0} done!")
+        time.sleep(2)
+        self.cmd_signal.emit(f"set_db_status_text")
+        self.running = False
+        
 

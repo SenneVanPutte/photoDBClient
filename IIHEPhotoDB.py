@@ -13,7 +13,7 @@ class IIHEPhotoDB:
         username="CleanRoom" # User name in the PhotoDB
         print("Connecting to the DB...!")
         url= "https://photodb.iihe.ac.be/ws.php?format=json"
-        load = {"method": "pwg.session.login", "username": username, "password": "IIHE"}   # password is needed
+        load = {"method": "pwg.session.login", "username": username, "password": "*****"}   # password is needed
         try:
             api_req = requests.post(url, load)
             api = json.loads(api_req.content.decode('utf-8'))
@@ -81,8 +81,7 @@ class IIHEPhotoDB:
             data["comment"]=comment
             if tag_str != "":
                 data["tags"]=tag_str
-            # data["name"]="CleanRoom"
-            print(data["tags"])
+                print(data["tags"])
 
             file_to_send = {'image': open(image_path,'rb')}
             try:
