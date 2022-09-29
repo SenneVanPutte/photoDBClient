@@ -60,6 +60,8 @@ class App(QWidget):
         self.cmd_thread = None
 
         v_box.addWidget(self.title_label)
+        v_box.addWidget(button_creator("Stop stream"   , self.stop_streaming))
+        v_box.addWidget(button_creator("Start stream"   , self.start_streaming))
         v_box.addWidget(button_creator("Take picture"   , self.take_picture))
         v_box.addWidget(button_creator("Take manual picture", self.manual_picture))
         v_box.addWidget(button_creator("Trigger focus", self.trigger_focus))
@@ -150,17 +152,19 @@ class App(QWidget):
 
     def stop_streaming(self):
         self.pause_stream = True
-        print("Stop streaming 1/3")
-        try:
-            self.stream_thread.stop()
-        except Exception as e:
-            print(f"Error {e}")
-        print("Stop streaming 2/3")
+        print("Stop streaming 1/3 [display]")
         try:
             self.thread.stop()
         except Exception as e:
             print(f"Error {e}")
-        print("Stop streaming 3/3")
+        time.sleep(0.1)
+        print("Stop streaming 2/3 [capture 1/2]")
+        try:
+            self.stream_thread.stop()
+        except Exception as e:
+            print(f"Error {e}")
+
+        print("Stop streaming 3/3 [capture 2/2]" )
         try:
             self.stream_thread.stop()
         except Exception as e:

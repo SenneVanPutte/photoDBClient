@@ -12,7 +12,13 @@ storage_dir = "./storage/"
 temp_db     = "./storage/database.csv"
 
 def get_summary():
-    print(subprocess.check_output(['gphoto2', '--summary']))
+    try:
+        output = subprocess.check_output(['gphoto2', '--summary'])
+
+    except Exception as e:
+        output = f"{e}"
+    print(output)
+    return output
 
 
 
@@ -63,21 +69,38 @@ class Stream(QThread):
 
     def run(self):
         self.run_flag = True
-        self.p1 = subprocess.Popen(["gphoto2", "--stdout", "--capture-movie"],stdout=subprocess.PIPE)
-        self.p2 = subprocess.Popen(f"ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video{videoId}",shell=True, stdin=self.p1.stdout)
+        # pro = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+        #                shell=True) 
+
+
+        # Send the signal to all the process group
+        # self.p1 = subprocess.Popen(f"gphoto2 --stdout --capture-movie | ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video{videoId}", shell=True, preexec_fn=os.setsid)
+        self.p1 = subprocess.Popen(["gphoto2", "--stdout", "--capture-movie"],stdout=subprocess.PIPE, preexec_fn=os.setsid)
+        self.p2 = subprocess.Popen(f"ffmpeg -i - -vcodec rawvideo -pix_fmt yuv420p -threads 0 -f v4l2 /dev/video{videoId}",shell=True, stdin=self.p1.stdout, preexec_fn=os.setsid)
 
 
     def stop(self):
         """Sets run flag to False and waits for thread to finish"""
         try:
-            #Send two Ctrl-C cmds...
+            # Send two Ctrl-C cmds...
+            print("Sending Ctrl-C")
+            # os.killpg(os.getpgid(self.p1.pid), signal.SIGTERM) 
+            # os.killpg(os.getpgid(self.p2.pid), signal.SIGTERM) 
+            # self.p1.terminate()
+            # os.killpg(os.getpgid(self.p1.pid), signal.SIGTERM)
             self.p1.terminate()
-            self.p2.terminate()
+            # self.p1.kill()
+            # self.p2.terminate()
+            time.sleep(0.5)
             self.p1.terminate()
+            time.sleep(0.5)
             self.p2.terminate()
+            print("Waiting")
             self.wait()
+            print("Done waiting")
             self.run_flag = False
             print("Done stopping video capture")
+
         except Exception as e:
             print("Error, unable to stop capture thread!")
             print(e)
@@ -113,13 +136,13 @@ class ManualFocus(QThread):
         print("Starting manual focus")
         self.cmd_signal.emit("stop_streaming")
         self.cmd_signal.emit("draw_bkg Stopping the stream...")
-        time.sleep(2)
+        time.sleep(3)
         self.cmd_signal.emit("draw_bkg Focussing ...")
         os.system("gphoto2 --wait-event 2s --set-config viewfinder=1 --set-config /main/actions/autofocusdrive=1 --wait-event=10s")
         self.cmd_signal.emit("draw_bkg Done Focussing!")
-        time.sleep(2)
+        # time.sleep(2)
         self.cmd_signal.emit("start_streaming")
-        print("Done manual focus")
+        # print("Done manual focus")
         self.running = False
 
 class ManualPicture(QThread):
@@ -131,8 +154,8 @@ class ManualPicture(QThread):
     def run(self):
         self.cmd_signal.emit("stop_streaming")
         self.cmd_signal.emit("draw_bkg Manual capture...")
-        time.sleep(2)
-        os.system("gphoto2 --wait-event 1s --set-config eosremoterelease=Immediate --set-config eosremoterelease='Release Full' --wait-event-and-download=1s")
+        time.sleep(3)
+        os.system("gphoto2 --wait-event 2s --set-config eosremoterelease=Immediate --set-config eosremoterelease='Release Full' --wait-event-and-download=2s")
         self.cmd_signal.emit("start_streaming")
         self.cmd_signal.emit("process_picture")
         print("Done manual picture")
@@ -148,6 +171,7 @@ class TakePicture(QThread):
 
     def run(self):
         self.cmd_signal.emit("stop_streaming")
+        time.sleep(0.1)
         self.cmd_signal.emit("draw_bkg Stopping the stream...")
         time.sleep(2)
         self.cmd_signal.emit("draw_bkg Getting summary...")
@@ -158,7 +182,10 @@ class TakePicture(QThread):
         time.sleep(2)
         self.cmd_signal.emit("start_streaming")
         self.cmd_signal.emit("draw_bkg restarting streaming...")
+        # self.cmd_signal.emit("draw_bkg Done!")
         self.cmd_signal.emit("unlock_interface")
+
+        time.sleep(5)
         self.cmd_signal.emit("process_picture")
         self.running = False
         self.stop()
