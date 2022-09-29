@@ -172,7 +172,7 @@ class App(QWidget):
         print("Done stop streaming")
 
     def process_picture(self):
-        f_name = datetime.datetime.now().strftime("%Y%d%m_%H%M%S")
+        f_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.timestamp = time.time()
 
         file_name = f"{f_name}.jpeg"
