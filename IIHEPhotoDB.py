@@ -71,7 +71,7 @@ class IIHEPhotoDB:
             data["method"]=["pwg.images.addSimple"]
             data["category"]=id_cat
             data["comment"]=comment
-            data["tags"]=tag
+            data["tags"]=[tag,metadata_list[-1]]
 
             file_to_send = {'image': open(image_path,'rb')}
             try:

@@ -33,11 +33,11 @@ class Capture(QThread):
 
     def run(self):
         # capture from web cam
-        cap = cv2.VideoCapture(videoId)
+        cap = None
         self.failed = False
         self._run_flag = True
         while self._run_flag:
-            while not cap.isOpened() and self._run_flag:
+            while cap == None or not cap.isOpened() and self._run_flag:
                 time.sleep(0.1)
                 cap = cv2.VideoCapture(videoId)
             ret, cv_img = cap.read()

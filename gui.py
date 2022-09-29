@@ -1,5 +1,5 @@
 from PyQt5 import QtGui
-from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QComboBox, QPushButton,QHBoxLayout,QVBoxLayout,QGroupBox, QLineEdit,QTextEdit
+from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QComboBox, QPushButton,QHBoxLayout,QVBoxLayout,QGroupBox, QLineEdit,QTextEdit, QFileDialog,QMessageBox
 from PyQt5.QtGui import QPixmap
 import sys
 import cv2
@@ -31,6 +31,20 @@ def sanitize(input_txt):
     output_txt = input_txt.replace("\n","\\n")
     output_txt = output_txt.replace(";"," ")
     return output_txt
+
+def question_popup(text):
+   msgBox = QMessageBox()
+   msgBox.setIcon(QMessageBox.Information)
+   msgBox.setText(text)
+   msgBox.setWindowTitle("Alert")
+   msgBox.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+   #msgBox.buttonClicked.connect(msgButtonClick)
+
+   returnValue = msgBox.exec()
+   if returnValue == QMessageBox.Ok:
+       return 1
+   else:
+       return 0
 
 
 class App(QWidget):
@@ -65,6 +79,7 @@ class App(QWidget):
         v_box.addWidget(button_creator("Take picture"   , self.take_picture))
         v_box.addWidget(button_creator("Take manual picture", self.manual_picture))
         v_box.addWidget(button_creator("Trigger focus", self.trigger_focus))
+        v_box.addWidget(button_creator("Load picture from file", self.load_file))
         
         self.view_picture_button = button_creator("View picture"  , self.open_picture)
         v_box.addWidget(self.view_picture_button)
@@ -83,6 +98,9 @@ class App(QWidget):
         v_box.addWidget(QLabel("Part ID:"))
         self.part_name = QLineEdit("")
         v_box.addWidget(self.part_name)
+        v_box.addWidget(QLabel("Module (if any):"))
+        self.module_name = QLineEdit("")
+        v_box.addWidget(self.module_name)
         v_box.addWidget(QLabel("User Comment:"))
         self.user_comment = QTextEdit("")
         v_box.addWidget(self.user_comment)
@@ -99,7 +117,7 @@ class App(QWidget):
         self.thread.change_pixmap_signal.connect(self.update_image)
 
         # self.take_picture_thread = gui_threads.TakePicture(self)
-
+        self.last_picture = None
         self.stream_thread = gui_threads.Stream()
         self.start_streaming()
         self.title_label.resize(400, 50)
@@ -137,7 +155,6 @@ class App(QWidget):
     def draw_bkg(self,*text):
         tt = " ".join(text)
         if text != None:
-            print(f"Background : {tt}")
             img_copy = self.default_img.copy()
             font = cv2.FONT_HERSHEY_DUPLEX
             cv2.putText(img_copy, tt, (50,450), font, 3, (100, 0, 0), 2, cv2.LINE_AA)
@@ -152,24 +169,28 @@ class App(QWidget):
 
     def stop_streaming(self):
         self.pause_stream = True
+        self.draw_bkg("Stopping stream 1/3...")
         print("Stop streaming 1/3 [display]")
-        try:
-            self.thread.stop()
-        except Exception as e:
-            print(f"Error {e}")
-        time.sleep(0.1)
-        print("Stop streaming 2/3 [capture 1/2]")
         try:
             self.stream_thread.stop()
         except Exception as e:
             print(f"Error {e}")
+        time.sleep(0.1)
+        print("Stop streaming 2/3 [capture 1/2]")
+        self.draw_bkg("Stopping stream 2/3...")
+        try:
+            self.stream.stop()
+        except Exception as e:
+            print(f"Error {e}")
 
         print("Stop streaming 3/3 [capture 2/2]" )
+        self.draw_bkg("Stopping stream 2/3...")
         try:
             self.stream_thread.stop()
         except Exception as e:
             print(f"Error {e}")
         print("Done stop streaming")
+        self.draw_bkg("Stream stopped")
 
     def process_picture(self):
         f_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -206,11 +227,27 @@ class App(QWidget):
         self.stream_thread.stop()
         event.accept()
 
+    def load_file(self):
+        if self.last_picture != None:
+            if question_popup("Warning, unsaved picture will be lost.") == 0:
+                return
+
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.AnyFile)
+        dlg.setNameFilter("Pictures (*.jpeg *.jpg)")
+        
+        if dlg.exec_():
+            self.last_picture = dlg.selectedFiles()[0]
+            print(self.last_picture)
+            self.unlock_interface()
+        
+        
+
 
     def store_picture(self):
         # Adding line to csv file:
         output_file = self.last_picture.replace(temp_dir,storage_dir)
-        line = f"{self.timestamp};{self.type_selector.currentText()};{sanitize(self.part_name.text())};{sanitize(self.user_comment.toPlainText())}; {output_file}\n"
+        line = f"{self.timestamp};{self.type_selector.currentText()};{sanitize(self.part_name.text())};{sanitize(self.user_comment.toPlainText())}; {output_file}; {sanitize(self.module_name.text())}\n"
         print(line)
         with open(temp_db, 'a') as f:
             f.write(line)
