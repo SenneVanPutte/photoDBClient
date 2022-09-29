@@ -104,9 +104,10 @@ class App(QWidget):
         v_box.addWidget(QLabel("User Comment:"))
         self.user_comment = QTextEdit("")
         v_box.addWidget(self.user_comment)
-        v_box.addWidget(QLabel("Local file:"))
-        self.file_name_widget = QLabel()
-        v_box.addWidget(self.file_name_widget)
+        self.db_widget_l0 = QLabel()
+        self.db_widget_l1 = QLabel()
+        v_box.addWidget(self.db_widget_l0)
+        v_box.addWidget(self.db_widget_l1)
 
         # set the vbox layout as the widgets layout
         self.setLayout(hbox)
@@ -169,27 +170,18 @@ class App(QWidget):
 
     def stop_streaming(self):
         self.pause_stream = True
-        self.draw_bkg("Stopping stream 1/3...")
-        print("Stop streaming 1/3 [display]")
+        self.draw_bkg("Stopping stream 1/2...")
         try:
             self.stream_thread.stop()
         except Exception as e:
             print(f"Error {e}")
         time.sleep(0.1)
-        print("Stop streaming 2/3 [capture 1/2]")
-        self.draw_bkg("Stopping stream 2/3...")
+        self.draw_bkg("Stopping stream 2/2...")
         try:
             self.stream.stop()
         except Exception as e:
             print(f"Error {e}")
 
-        print("Stop streaming 3/3 [capture 2/2]" )
-        self.draw_bkg("Stopping stream 2/3...")
-        try:
-            self.stream_thread.stop()
-        except Exception as e:
-            print(f"Error {e}")
-        print("Done stop streaming")
         self.draw_bkg("Stream stopped")
 
     def process_picture(self):
@@ -204,7 +196,8 @@ class App(QWidget):
                 suffix+=1
         os.system(f"mv capt0000.jpg {temp_dir}/{file_name}")
         self.last_picture = temp_dir+"/"+file_name
-        self.file_name_widget.setText(self.last_picture)
+        self.db_widget_l0.setText(f"File   : {self.last_picture}")
+        self.db_widget_l1.setText("Status : local")
         self.store_picture_button.setEnabled(1)
         self.view_picture_button.setEnabled(1)
 
@@ -223,8 +216,9 @@ class App(QWidget):
         self.view_picture_button.setEnabled(1)
 
     def closeEvent(self, event):
-        self.thread.stop()
-        self.stream_thread.stop()
+        self.stop_streaming()
+        # self.thread.stop()
+        # self.stream_thread.stop()
         event.accept()
 
     def load_file(self):
@@ -238,46 +232,22 @@ class App(QWidget):
         
         if dlg.exec_():
             self.last_picture = dlg.selectedFiles()[0]
-            print(self.last_picture)
+            self.db_widget_l0.setText(f"File   : {self.last_picture}")
+            self.db_widget_l1.setText("Status : local")
             self.unlock_interface()
         
         
+    def set_db_status_text(self,l0 = "",l1 = ""):
+        self.db_widget_l0.setText(l0)
+        self.db_widget_l1.setText(l1)
 
 
     def store_picture(self):
-        # Adding line to csv file:
-        output_file = self.last_picture.replace(temp_dir,storage_dir)
-        line = f"{self.timestamp};{self.type_selector.currentText()};{sanitize(self.part_name.text())};{sanitize(self.user_comment.toPlainText())}; {output_file}; {sanitize(self.module_name.text())}\n"
-        print(line)
-        with open(temp_db, 'a') as f:
-            f.write(line)
-        os.system(f"mv {self.last_picture} {output_file}")
-        try:
-            db=IIHEPhotoDB.IIHEPhotoDB()
-        except Exception as e:
-            print("Cannot connect to DB\n")
-        else:
-            cat_exist=0
-            cat_list=db.getListOfFolder()
-            folder_Name=self.type_selector.currentText()
-            for i in cat_list:
-                cell_list=i.split(" - ")
-                if(cell_list[1]==folder_Name):
-                    cat_id = cell_list[0]
-                    cat_exist=1
-            if(cat_exist==0):
-                print("New Folder creating...")
-                cat_id = db.createFolder(folder_Name)
-            db.uploadImage(output_file, cat_id, line)
-
-        #Upload to db here
-
+        self.launch_stream(gui_threads.StorePicture(self.timestamp,self.type_selector.currentText(),sanitize(self.part_name.text()),sanitize(self.module_name.text()),sanitize(self.user_comment.toPlainText()),self.last_picture))
         self.timestamp = 0
         self.last_picture = None
         self.store_picture_button.setDisabled(1)
         self.view_picture_button.setDisabled(1)
-        self.file_name_widget.setText("")
-        print("Done!")
 
     def open_picture(self):
         os.system(f"eog {self.last_picture} &")

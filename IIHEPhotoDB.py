@@ -13,7 +13,7 @@ class IIHEPhotoDB:
         username="CleanRoom" # User name in the PhotoDB
         print("Connecting to the DB...!")
         url= "https://photodb.iihe.ac.be/ws.php?format=json"
-        load = {"method": "pwg.session.login", "username": username, "password": "*****"}   # password is needed
+        load = {"method": "pwg.session.login", "username": username, "password": "IIHE"}   # password is needed
         try:
             api_req = requests.post(url, load)
             api = json.loads(api_req.content.decode('utf-8'))
@@ -71,7 +71,7 @@ class IIHEPhotoDB:
             data["method"]=["pwg.images.addSimple"]
             data["category"]=id_cat
             data["comment"]=comment
-            data["tags"]=[tag,metadata_list[-1]]
+            data["tags"]=f"{tag},{metadata_list[-1]}"
 
             file_to_send = {'image': open(image_path,'rb')}
             try:
@@ -84,4 +84,4 @@ class IIHEPhotoDB:
                     print("Picture is NOT uploaded to DB")
                     print(api)
             except Exception as e:
-                print("Error while uploading")
+                print(f"Error while uploading {e}")

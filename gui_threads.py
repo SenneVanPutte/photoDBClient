@@ -4,6 +4,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread,QPoint
 import numpy as np
 import time, datetime
 import subprocess, os, signal
+import IIHEPhotoDB
 
 videoId     = 0
 
@@ -89,12 +90,10 @@ class Stream(QThread):
             # self.p1.terminate()
             # os.killpg(os.getpgid(self.p1.pid), signal.SIGTERM)
             self.p1.terminate()
-            # self.p1.kill()
-            # self.p2.terminate()
-            time.sleep(0.5)
-            self.p1.terminate()
-            time.sleep(0.5)
+            time.sleep(0.2)
             self.p2.terminate()
+            # time.sleep(0.5)
+            # self.p1.terminate()
             print("Waiting")
             self.wait()
             print("Done waiting")
@@ -153,10 +152,11 @@ class ManualPicture(QThread):
 
     def run(self):
         self.cmd_signal.emit("stop_streaming")
+        time.sleep(0.5)
         self.cmd_signal.emit("draw_bkg Manual capture...")
-        time.sleep(3)
-        os.system("gphoto2 --wait-event 2s --set-config eosremoterelease=Immediate --set-config eosremoterelease='Release Full' --wait-event-and-download=2s")
+        os.system("gphoto2 --wait-event 1s --set-config eosremoterelease=Immediate --set-config eosremoterelease='Release Full' --wait-event-and-download=2s")
         self.cmd_signal.emit("start_streaming")
+        time.sleep(1)
         self.cmd_signal.emit("process_picture")
         print("Done manual picture")
         self.running = False
@@ -171,24 +171,70 @@ class TakePicture(QThread):
 
     def run(self):
         self.cmd_signal.emit("stop_streaming")
-        time.sleep(0.1)
-        self.cmd_signal.emit("draw_bkg Stopping the stream...")
-        time.sleep(2)
-        self.cmd_signal.emit("draw_bkg Getting summary...")
-        get_summary()
-        time.sleep(2)
+        time.sleep(0.3)
+        # self.cmd_signal.emit("draw_bkg Getting summary...")
+        print(get_summary())
+        # time.sleep(0.5)
         self.cmd_signal.emit("draw_bkg Taking picture...")
-        os.system(f"gphoto2 --wait-event=2s --capture-image-and-download ")
-        time.sleep(2)
-        self.cmd_signal.emit("start_streaming")
+        os.system(f"gphoto2 --wait-event=1s --capture-image-and-download ")
+        # time.sleep(0.5)
         self.cmd_signal.emit("draw_bkg restarting streaming...")
+        self.cmd_signal.emit("start_streaming")
         # self.cmd_signal.emit("draw_bkg Done!")
-        self.cmd_signal.emit("unlock_interface")
 
-        time.sleep(5)
+        time.sleep(1)
         self.cmd_signal.emit("process_picture")
+        self.cmd_signal.emit("unlock_interface")
         self.running = False
         self.stop()
 
     def stop(self):
         print("Done")
+
+class StorePicture(QThread):
+
+    cmd_signal = pyqtSignal(str)
+    def __init__(self,timestamp,object_type,object_id,module_id,comment,file_name):
+        super().__init__()
+        self.running = True
+        self.timestamp = timestamp
+        self.object_type = object_type
+        self.object_id = object_id
+        self.module_id = module_id
+        self.comment = comment
+        self.file_name = file_name
+
+    def run(self):
+        # Adding line to csv file:
+        l0 = f"{self.file_name}"
+        l1 = f"Connecting_to_db..."
+        self.cmd_signal.emit(f"set_db_status_text {l0} {l1}")
+        self.output_file = self.file_name.replace(temp_dir,storage_dir)
+        line = f"{self.timestamp};{self.object_type};{self.object_id};{self.comment};{self.output_file}; {self.module_id}\n"
+        with open(temp_db, 'a') as f:
+            f.write(line)
+        os.system(f"mv {self.file_name} {self.output_file}")
+
+        try:
+            db=IIHEPhotoDB.IIHEPhotoDB()
+        except Exception as e:
+            print(f"Cannot connect to DB : {e}\n")
+        else:
+            self.cmd_signal.emit(f"set_db_status_text {l0} connected_to_db...")
+            cat_exist=0
+            cat_list=db.getListOfFolder()
+            folder_Name=self.object_type
+            for i in cat_list:
+                cell_list=i.split(" - ")
+                if(cell_list[1]==folder_Name):
+                    cat_id = cell_list[0]
+                    cat_exist=1
+            if(cat_exist==0):
+                print("New Folder creating...")
+                self.cmd_signal.emit(f"set_db_status_text {l0} creating_folder...")
+                cat_id = db.createFolder(folder_Name)
+            self.cmd_signal.emit(f"set_db_status_text {l0} uploading_to_db...")
+            db.uploadImage(self.output_file, cat_id, line)
+
+        self.cmd_signal.emit(f"set_db_status_text {l0} done!")
+
