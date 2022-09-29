@@ -211,6 +211,7 @@ class StorePicture(QThread):
         self.cmd_signal.emit(f"set_db_status_text {l0} {l1}")
         self.output_file = self.file_name.replace(temp_dir,storage_dir)
         line = f"{self.timestamp};{self.object_type};{self.object_id};{self.comment};{self.output_file}; {self.module_id}\n"
+        tags = [self.object_id,self.module_id]
         with open(temp_db, 'a') as f:
             f.write(line)
         os.system(f"mv {self.file_name} {self.output_file}")
@@ -234,7 +235,7 @@ class StorePicture(QThread):
                 self.cmd_signal.emit(f"set_db_status_text {l0} creating_folder...")
                 cat_id = db.createFolder(folder_Name)
             self.cmd_signal.emit(f"set_db_status_text {l0} uploading_to_db...")
-            db.uploadImage(self.output_file, cat_id, line)
+            db.uploadImage(output_file, cat_id, tags,self.comment)
 
         self.cmd_signal.emit(f"set_db_status_text {l0} done!")
 

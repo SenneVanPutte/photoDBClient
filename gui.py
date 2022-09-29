@@ -244,6 +244,7 @@ class App(QWidget):
 
     def store_picture(self):
         self.launch_stream(gui_threads.StorePicture(self.timestamp,self.type_selector.currentText(),sanitize(self.part_name.text()),sanitize(self.module_name.text()),sanitize(self.user_comment.toPlainText()),self.last_picture))
+
         self.timestamp = 0
         self.last_picture = None
         self.store_picture_button.setDisabled(1)
