@@ -41,7 +41,7 @@ class IIHEPhotoDB:
         for i in api["result"]["categories"]:
             result.append(str(i["id"])+' - '+ str(i["name"]))
             text = '\n'.join(result)
-        print("List of albums (id  -  name):")    
+        print("List of albums (id  -  name):")
         print(text)
         return result
 
@@ -59,11 +59,19 @@ class IIHEPhotoDB:
                 print(api)
         except Exception as e:
             print("Error...")
-    def uploadImage(self, image_path, id_cat, metadata):
-            metadata_list=metadata.split(";")
-            tag=metadata_list[2]
-            comment=metadata_list[3]
+    def uploadImage(self, image_path, id_cat, tags,comment):
+            # metadata_list=metadata.split(";")
+            # tag=metadata_list[2]+","+metadata_list[-1].replace('\n','')
+            # comment=metadata_list[3]
+            tag_str = ""
+            for tt in tags:
+                if tt!="":
+                    tag_str+=","
+            
+            if len(tag_str) > 0:
+                tag_str = tag_str[:-1] #removing trailing ","
 
+            
             url = "https://photodb.iihe.ac.be/ws.php?format=json"
             headers = {'Content_Type': 'form-data'}
 
@@ -71,12 +79,18 @@ class IIHEPhotoDB:
             data["method"]=["pwg.images.addSimple"]
             data["category"]=id_cat
             data["comment"]=comment
-            data["tags"]=[tag,metadata_list[-1]]
+            if tag_str != "":
+                data["tags"]=tag_str
+            # data["name"]="CleanRoom"
+            print(data["tags"])
 
             file_to_send = {'image': open(image_path,'rb')}
             try:
                 api_req = requests.post(url, data, files=file_to_send, cookies=cookies, headers=headers)
+                print(api_req)
+                print(api_req.content.decode("utf-8"))
                 api = json.loads(api_req.content.decode('utf-8'))
+                print(api)
                 if(api['stat']=='ok'):
                     print("Picture is uploaded to DB")
                     print(api)
@@ -84,4 +98,4 @@ class IIHEPhotoDB:
                     print("Picture is NOT uploaded to DB")
                     print(api)
             except Exception as e:
-                print("Error while uploading")
+                print(f"Error while uploading: {e}")

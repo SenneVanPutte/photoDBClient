@@ -249,6 +249,7 @@ class App(QWidget):
         output_file = self.last_picture.replace(temp_dir,storage_dir)
         line = f"{self.timestamp};{self.type_selector.currentText()};{sanitize(self.part_name.text())};{sanitize(self.user_comment.toPlainText())}; {output_file}; {sanitize(self.module_name.text())}\n"
         print(line)
+        tags = [sanitize(self.part_name.text()), sanitize(self.module_name.text())]
         with open(temp_db, 'a') as f:
             f.write(line)
         os.system(f"mv {self.last_picture} {output_file}")
@@ -268,7 +269,7 @@ class App(QWidget):
             if(cat_exist==0):
                 print("New Folder creating...")
                 cat_id = db.createFolder(folder_Name)
-            db.uploadImage(output_file, cat_id, line)
+            db.uploadImage(output_file, cat_id, tags,sanitize(self.user_comment.toPlainText()))
 
         #Upload to db here
 
