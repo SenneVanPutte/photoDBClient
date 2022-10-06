@@ -1,9 +1,13 @@
 import sys
 import cv2
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread,QPoint
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread,QPoint, QBuffer
 import numpy as np
 import time, datetime
 import subprocess, os, signal
+
+from PIL import Image
+from pylibdmtx.pylibdmtx import decode
+
 
 videoId     = 0
 
@@ -91,9 +95,7 @@ class Stream(QThread):
             self.p1.terminate()
             # self.p1.kill()
             # self.p2.terminate()
-            time.sleep(0.5)
-            self.p1.terminate()
-            time.sleep(0.5)
+            time.sleep(0.1)
             self.p2.terminate()
             print("Waiting")
             self.wait()
@@ -192,3 +194,42 @@ class TakePicture(QThread):
 
     def stop(self):
         print("Done")
+
+class QRAnalyzer(QThread):
+    cmd_signal = pyqtSignal(str)
+    def __init__(self):
+        super().__init__()
+        self.running = True
+
+
+    def run(self):
+        print("Opening file...")
+        self.img = Image.open('IMG_8483.JPG')
+        # for i in [10,5,2,1]:
+        #     self.get_QR(i)
+        self.get_QR(1)
+        self.running = False
+        
+
+    def get_QR(self,scale_factor):
+        # buffer = QBuffer()
+        # buffer.open(QBuffer.ReadWrite)
+        # self.label.full_img.save(buffer, "PNG")
+        # img = Image.open(io.BytesIO(buffer.data()))
+
+        print(f"Rescaling... {scale_factor}")
+        img_scaled = self.img.resize((int(6000/scale_factor),int(4000/scale_factor)))
+        # thresh = 200
+        # fn = lambda x : 255 if x > thresh else 0
+        # img_scaled = img_scaled.convert("L").point(fn, mode='L')
+        
+        # img_scaled = img.crop((min(x_0,x_1), min(y_0,y_1), max(x_0,x_1), max(y_0,y_1)))
+
+        #qImage = ImageQt(img_scaled)
+        #pixmap = QPixmap.fromImage(qImage)
+        #self.label.setPixmap(pixmap)
+        #self.label.updateImg = False
+        img_scaled.show()
+        print("decoding")
+        data = decode(img_scaled)
+        print(data)
