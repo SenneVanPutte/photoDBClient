@@ -81,8 +81,7 @@ class IIHEPhotoDB:
             data["comment"]=comment
             if tag_str != "":
                 data["tags"]=tag_str
-            # data["name"]="CleanRoom"
-            print(data["tags"])
+                print(data["tags"])
 
             file_to_send = {'image': open(image_path,'rb')}
             try:
