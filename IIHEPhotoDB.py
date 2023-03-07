@@ -13,7 +13,7 @@ class IIHEPhotoDB:
         username="CleanRoom" # User name in the PhotoDB
         print("Connecting to the DB...!")
         url= "https://photodb.iihe.ac.be/ws.php?format=json"
-        load = {"method": "pwg.session.login", "username": username, "password": "*****"}   # password is needed
+        load = {"method": "pwg.session.login", "username": username, "password": "****"}   # password is needed
         try:
             api_req = requests.post(url, load)
             api = json.loads(api_req.content.decode('utf-8'))
@@ -30,13 +30,18 @@ class IIHEPhotoDB:
     def getListOfFolder(self):
         try:
             api_req = requests.get("https://photodb.iihe.ac.be/ws.php?format=json&method=pwg.categories.getList&recursive=true", cookies= cookies)
-            api = json.loads(api_req.content.decode('utf-8'))
+            print(api_req.content)
+            ttt = api_req.content.decode('utf-8').split("\n")[-1]
+            print(ttt)
+            api = json.loads(ttt)#api_req.content.decode('utf-8'))
             if(api['stat']=='ok'):
                 print("Success!")
             if(api['stat']=='fail'):
                 print("Failed!")
         except Exception as e:
-            print("Error...")
+            print("Error, unable to get list of folders!")
+            print(e)
+            return []
         result = []
         for i in api["result"]["categories"]:
             result.append(str(i["id"])+' - '+ str(i["name"]))
@@ -65,27 +70,31 @@ class IIHEPhotoDB:
             # comment=metadata_list[3]
             tag_str = ""
             for tt in tags:
+                while len(tt) > 0 and tt[0] == " ":
+                  tt = tt[1:]
+                while len(tt) > 0 and tt[-1] == " ":
+                  tt = tt[:-1]
                 if tt!="":
-                    tag_str+=","
+                    tag_str+=tt+","
             
             if len(tag_str) > 0:
                 tag_str = tag_str[:-1] #removing trailing ","
-
+            print(tag_str)
             
             url = "https://photodb.iihe.ac.be/ws.php?format=json"
             headers = {'Content_Type': 'form-data'}
 
-            data={}
-            data["method"]=["pwg.images.addSimple"]
-            data["category"]=id_cat
-            data["comment"]=comment
+            pic_data={}
+            pic_data["method"]="pwg.images.addSimple"
+            pic_data["category"]=id_cat
+            pic_data["comment"]=comment
             if tag_str != "":
-                data["tags"]=tag_str
-                print(data["tags"])
-
+                pic_data["tags"]=tag_str
+                print(pic_data["tags"])
+            #pic_data["image"] = open(image_path,'rb')
             file_to_send = {'image': open(image_path,'rb')}
             try:
-                api_req = requests.post(url, data, files=file_to_send, cookies=cookies, headers=headers)
+                api_req = requests.post(url, params=pic_data, data = pic_data, files = file_to_send, cookies = cookies, headers = headers)#, files=file_to_send)#, files=file_to_send, cookies=cookies, headers=headers)
                 print(api_req)
                 print(api_req.content.decode("utf-8"))
                 api = json.loads(api_req.content.decode('utf-8'))

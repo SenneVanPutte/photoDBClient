@@ -6,8 +6,8 @@ import time, datetime
 import subprocess, os, signal
 import IIHEPhotoDB
 
-from PIL import Image
-from pylibdmtx.pylibdmtx import decode
+"""from PIL import Image"""
+#from pylibdmtx.pylibdmtx import decode
 
 
 videoId     = 0
@@ -195,7 +195,7 @@ class TakePicture(QThread):
     def stop(self):
         print("Done")
 
-class QRAnalyzer(QThread):
+"""class QRAnalyzer(QThread):
     cmd_signal = pyqtSignal(str)
     def __init__(self):
         super().__init__()
@@ -233,6 +233,8 @@ class QRAnalyzer(QThread):
         print("decoding")
         data = decode(img_scaled)
         print(data)
+"""
+
 class StorePicture(QThread):
 
     cmd_signal = pyqtSignal(str)
@@ -253,7 +255,8 @@ class StorePicture(QThread):
         self.cmd_signal.emit(f"set_db_status_text {l0} {l1}")
         self.output_file = self.file_name.replace(temp_dir,storage_dir)
         line = f"{self.timestamp};{self.object_type};{self.object_id};{self.comment};{self.output_file}; {self.module_id}\n"
-        tags = [self.object_id,self.module_id]
+        
+        tags = [oo for oo in self.object_id.split(",")]+[oo for oo in self.module_id.split(",")]
         with open(temp_db, 'a') as f:
             f.write(line)
         os.system(f"mv {self.file_name} {self.output_file}")

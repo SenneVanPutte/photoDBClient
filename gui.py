@@ -80,7 +80,7 @@ class App(QWidget):
         v_box.addWidget(button_creator("Take manual picture", self.manual_picture))
         v_box.addWidget(button_creator("Trigger focus", self.trigger_focus))
         v_box.addWidget(button_creator("Load picture from file", self.load_file))
-        v_box.addWidget(button_creator("analyze_QR", self.analyze_QR))
+        #v_box.addWidget(button_creator("analyze_QR", self.analyze_QR))
         
         
         self.view_picture_button = button_creator("View picture"  , self.open_picture)
@@ -122,7 +122,7 @@ class App(QWidget):
         # self.take_picture_thread = gui_threads.TakePicture(self)
         self.last_picture = None
         self.stream_thread = gui_threads.Stream()
-        # self.start_streaming()
+        self.start_streaming()
         self.title_label.resize(400, 50)
         self.streams = []
         self.methods = [func for func in dir(self) if callable(getattr(self, func))]
