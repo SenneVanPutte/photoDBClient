@@ -1,109 +1,92 @@
 import requests
 import json
-import urllib
-
-import os
-
-import hashlib
+try:
+    from piwigo import Piwigo
+except:
+    print("Fatal error, Piwigo is not installed!")
+    print("Try : 'pip3 install piwigo'")
+    raise
 
 class IIHEPhotoDB:
-    def __init__(self):
+    def __init__(self , silent = True):
         global cookies
-
         username="CleanRoom" # User name in the PhotoDB
-        print("Connecting to the DB...!")
-        url= "https://photodb.iihe.ac.be/ws.php?format=json"
-        load = {"method": "pwg.session.login", "username": username, "password": "****"}   # password is needed
+        password="****"
+        self.silent = silent
+
+        self.db = Piwigo('https://photodb.iihe.ac.be/')
+
         try:
-            api_req = requests.post(url, load)
-            api = json.loads(api_req.content.decode('utf-8'))
-            if(api['stat']=='ok'):
-                print("Connected")
-                print(api)
-            if(api['stat']=='fail'):
-                print("Not Connected")
-                print(api)
+            if self.db.pwg.session.login(username=username, password=password) == True:
+                if self.silent == False:
+                    print("Connection successful")
+            else:
+                print("Unable to connect to the db")
+                raise
         except Exception as e:
-            print("Error...")
+            print(f"Unable to connect to db: {e}")
             raise
-        cookies=api_req.cookies
+
     def getListOfFolder(self):
         try:
-            api_req = requests.get("https://photodb.iihe.ac.be/ws.php?format=json&method=pwg.categories.getList&recursive=true", cookies= cookies)
-            print(api_req.content)
-            ttt = api_req.content.decode('utf-8').split("\n")[-1]
-            print(ttt)
-            api = json.loads(ttt)#api_req.content.decode('utf-8'))
-            if(api['stat']=='ok'):
-                print("Success!")
-            if(api['stat']=='fail'):
-                print("Failed!")
+            api = self.db.pwg.categories.getList(recursive=True)
+            result = []
+            for i in api["categories"]:
+                result.append(str(i["id"])+' - '+ str(i["name"]))
+                text = '\n'.join(result)
+            if not self.silent:
+                print("List of albums (id  -  name):")
+                print(text)
+            return result    
+        
         except Exception as e:
-            print("Error, unable to get list of folders!")
-            print(e)
+            print(f"Error, unable to get list of folders: {e}")
             return []
-        result = []
-        for i in api["result"]["categories"]:
-            result.append(str(i["id"])+' - '+ str(i["name"]))
-            text = '\n'.join(result)
-        print("List of albums (id  -  name):")
-        print(text)
-        return result
+        
 
     def createFolder(self, folder_name):
         ## Create in parent folder "IIHE camera stand": id = 149
         try:
-            api_req = requests.get("https://photodb.iihe.ac.be/ws.php?format=json&method=pwg.categories.add&name=%s&parent=149&status=private" % (folder_name), cookies=cookies)
-            api = json.loads(api_req.content.decode('utf-8'))
-            if(api['stat']=='ok'):
-                print("Album is created!")
-                alb_id = str(api["result"]["id"])
-                return alb_id
-            if(api['stat']=='fail'):
-                print("Failed to create an album!")
-                print(api)
+            api = self.db.pwg.categories.add(name=folder_name,parent="149",status="private")
+            if(api['info']=='Album added'):
+                if not self.silent:
+                    print("Album is created!")
+                return api["id"]
+            else:
+                print(f"Error, unable to create album : {api['info']}")
+                return -1
         except Exception as e:
-            print("Error...")
-    def uploadImage(self, image_path, id_cat, tags,comment):
-            # metadata_list=metadata.split(";")
-            # tag=metadata_list[2]+","+metadata_list[-1].replace('\n','')
-            # comment=metadata_list[3]
-            tag_str = ""
-            for tt in tags:
-                while len(tt) > 0 and tt[0] == " ":
-                  tt = tt[1:]
-                while len(tt) > 0 and tt[-1] == " ":
-                  tt = tt[:-1]
-                if tt!="":
-                    tag_str+=tt+","
-            
-            if len(tag_str) > 0:
-                tag_str = tag_str[:-1] #removing trailing ","
-            print(tag_str)
-            
-            url = "https://photodb.iihe.ac.be/ws.php?format=json"
-            headers = {'Content_Type': 'form-data'}
+            print(f"Error, unable to create album : {e}")
+            return -1
 
-            pic_data={}
-            pic_data["method"]="pwg.images.addSimple"
-            pic_data["category"]=id_cat
-            pic_data["comment"]=comment
-            if tag_str != "":
-                pic_data["tags"]=tag_str
-                print(pic_data["tags"])
-            #pic_data["image"] = open(image_path,'rb')
-            file_to_send = {'image': open(image_path,'rb')}
-            try:
-                api_req = requests.post(url, params=pic_data, data = pic_data, files = file_to_send, cookies = cookies, headers = headers)#, files=file_to_send)#, files=file_to_send, cookies=cookies, headers=headers)
-                print(api_req)
-                print(api_req.content.decode("utf-8"))
-                api = json.loads(api_req.content.decode('utf-8'))
+    def uploadImage(self, image_path, id_cat, tags,comment):
+        tag_str = ""
+        for tt in tags:
+            while len(tt) > 0 and tt[0] == " ":
+                tt = tt[1:]
+            while len(tt) > 0 and tt[-1] == " ":
+                tt = tt[:-1]
+            if tt!="":
+                tag_str+=tt+","
+        
+        if len(tag_str) > 0:
+            tag_str = tag_str[:-1] #removing trailing ","
+        if self.silent == False:
+            print(f"Tags : {tag_str}")
+
+        try:
+            api = self.db.pwg.images.addSimple(image=image_path, category=id_cat,tags=tag_str, comment=comment)
+            
+            if self.silent == False:
+                print("Image upload successful!")
                 print(api)
-                if(api['stat']=='ok'):
-                    print("Picture is uploaded to DB")
-                    print(api)
-                if(api['stat']=='fail'):
-                    print("Picture is NOT uploaded to DB")
-                    print(api)
-            except Exception as e:
-                print(f"Error while uploading: {e}")
+            return api['url']
+        except Exception as e:
+            print(f"Error while uploading: {e}")
+            return "Unable to upload picture!"
+
+if __name__ == "__main__":
+    db = IIHEPhotoDB(silent = False)
+    db.getListOfFolder()
+    db.createFolder("Testing")
+    db.uploadImage("default_img.jpg",152,["module_000"],"My comment")
