@@ -9,7 +9,6 @@ except:
 
 class IIHEPhotoDB:
     def __init__(self , silent = True):
-        global cookies
         username="CleanRoom" # User name in the PhotoDB
         password="****"
         self.silent = silent
