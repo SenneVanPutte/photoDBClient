@@ -1,5 +1,5 @@
-import requests
-import json
+import os
+
 try:
     from piwigo import Piwigo
 except:
@@ -9,14 +9,18 @@ except:
 
 class IIHEPhotoDB:
     def __init__(self , silent = True):
-        username="CleanRoom" # User name in the PhotoDB
-        password="****"
         self.silent = silent
+
+        # Read credentials from .photodb
+        self._load_credentials()
 
         self.db = Piwigo('https://photodb.iihe.ac.be/')
 
         try:
-            if self.db.pwg.session.login(username=username, password=password) == True:
+            if self.db.pwg.session.login(
+                username=self.username, 
+                password=self.password
+                ) == True:
                 if self.silent == False:
                     print("Connection successful")
             else:
@@ -83,6 +87,22 @@ class IIHEPhotoDB:
         except Exception as e:
             print(f"Error while uploading: {e}")
             return "Unable to upload picture!"
+    
+    def _load_credentials(self):
+        '''
+        Read ".photodb".
+        Load password and username.
+        '''
+        cfg_file = os.path.join(os.path.dirname(__file__), '.photodb')
+        o_file = open(cfg_file, 'r')
+        lines = o_file.readlines()
+        o_file.close()
+
+        for line in lines:
+            if line.startswith('USERNAME='):
+                self.username = line.replace('\n', '').replace('USERNAME=', '')
+            if line.startswith('PASSWORD='):
+                self.password = line.replace('\n', '').replace('PASSWORD=', '')
 
 if __name__ == "__main__":
     db = IIHEPhotoDB(silent = False)
