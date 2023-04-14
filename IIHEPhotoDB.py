@@ -86,7 +86,7 @@ class IIHEPhotoDB:
             return api['url']
         except Exception as e:
             print(f"Error while uploading: {e}")
-            return "Unable to upload picture!"
+            raise
     
     def _load_credentials(self):
         '''
