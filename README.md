@@ -2,7 +2,7 @@
 
 ## setup
 ```
-git clone https://github.com/SenneVanPutte/photoBDClient.git
+git clone https://gitlab.cern.ch/cmsphiitrackeriihe/photoDBClient.git
 cd photoDBClient
 pip3 install --editable .
 ```
