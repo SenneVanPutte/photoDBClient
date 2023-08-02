@@ -1,17 +1,18 @@
 # photoDBClient
 
 ## setup
-Install the `piwigo` package for python:
 ```
-pip3 install piwigo
+git clone https://github.com/SenneVanPutte/photoBDClient.git
+cd photoDBClient
+pip3 install --editable .
 ```
+This will make the package available on your system (more info related to the `setuptools` library [here](https://setuptools.pypa.io/en/latest/userguide/quickstart.html)).
 
-Clone the repo:
-```
-git clone https://github.com/SenneVanPutte/photoDBClient.git
-```
+The option `--editable` in the `pip` install ensures the package is setup in development mode.
+Thus changes to the source code will not require to rebuild and reinstall.
+If this is not desirable, just omit the `--editable` option.
 
-Go into the folder and copy paste the `.photodb.example` into `.photodb`.
+Copy paste the `.photodb.example` into `.photodb`.
 ```
 cd photoDBClient
 cp .photodb.example .photodb
